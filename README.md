@@ -60,6 +60,3 @@ Switch to **Agent mode** in Copilot Chat and ask it to generate an image.
 - [Nginx + HTTPS](https://github.com/codeadeel/picasso-mcp/wiki/Nginx-and-HTTPS) — production domain setup
 - [MCP Tools](https://github.com/codeadeel/picasso-mcp/wiki/MCP-Tools) — tool reference and parameters
 
-## License
-
-MIT
