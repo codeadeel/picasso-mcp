@@ -13,6 +13,8 @@ flowchart LR
 ## Features
 
 - Imagen and Gemini model support — auto-detected from model name
+- SSE transport for VS Code / remote clients
+- stdio transport for Claude Desktop — no proxy needed
 - Bearer token authentication
 - Single command deployment via Docker Compose
 - Nginx example config for domain + HTTPS
@@ -30,18 +32,19 @@ Edit `docker-compose.yml`:
 GOOGLE_API_KEY: "AIza..."
 GOOGLE_MODEL:   "gemini-2.0-flash-exp"
 MCP_AUTH_TOKEN: "your-secret-token"
+MCP_TRANSPORT:  "sse"
 ```
 
 ```bash
 docker compose up -d
 ```
 
-Add to `.vscode/mcp.json`:
+**VS Code + GitHub Copilot** — add to `.vscode/mcp.json`:
 
 ```json
 {
   "servers": {
-    "google-ai-image": {
+    "picasso-mcp": {
       "type": "sse",
       "url": "http://YOUR_SERVER_IP:8000/sse",
       "headers": { "Authorization": "Bearer your-secret-token" }
@@ -52,6 +55,41 @@ Add to `.vscode/mcp.json`:
 
 Switch to **Agent mode** in Copilot Chat and ask it to generate an image.
 
+**Claude Desktop (remote server)** — go to **Settings → Developer → Edit Config** and add:
+
+```json
+{
+  "mcpServers": {
+    "picasso-mcp": {
+      "url": "https://mcp.yourdomain.com/sse",
+      "headers": { "Authorization": "Bearer your-secret-token" }
+    }
+  }
+}
+```
+
+Restart Claude Desktop — the server appears under the tools icon in chat. Requires a domain with HTTPS — see [Nginx + HTTPS](https://github.com/codeadeel/picasso-mcp/wiki/Nginx-and-HTTPS).
+
+**Claude Desktop (local stdio)** — runs the container as a subprocess on your machine. No server needed:
+
+```json
+{
+  "mcpServers": {
+    "picasso-mcp": {
+      "command": "docker",
+      "args": [
+        "run", "--rm", "-i",
+        "-e", "GOOGLE_API_KEY=your-api-key",
+        "-e", "GOOGLE_MODEL=gemini-2.0-flash-exp",
+        "-e", "MCP_TRANSPORT=stdio",
+        "-v", "/tmp/picasso-images:/images",
+        "picasso-mcp:latest"
+      ]
+    }
+  }
+}
+```
+
 ## Wiki
 
 - [Configuration](https://github.com/codeadeel/picasso-mcp/wiki/Configuration) — models, environment variables
@@ -60,3 +98,6 @@ Switch to **Agent mode** in Copilot Chat and ask it to generate an image.
 - [Nginx + HTTPS](https://github.com/codeadeel/picasso-mcp/wiki/Nginx-and-HTTPS) — production domain setup
 - [MCP Tools](https://github.com/codeadeel/picasso-mcp/wiki/MCP-Tools) — tool reference and parameters
 
+## License
+
+MIT

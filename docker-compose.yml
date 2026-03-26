@@ -31,6 +31,9 @@ services:
       # Output directory inside the container (mapped to ./images on host)
       OUTPUT_DIR: "/images"
 
+      # Transport mode — "sse" for remote clients (VS Code, Nginx), "stdio" for Claude Desktop
+      MCP_TRANSPORT: "sse"
+
       # Internal bind address — no need to change when using Docker
       MCP_HOST: "0.0.0.0"
       MCP_PORT: "8000"

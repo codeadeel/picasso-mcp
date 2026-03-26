@@ -5,7 +5,7 @@ import logging
 import uvicorn
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
-from config   import GOOGLE_MODEL, MCP_AUTH_TOKEN, MCP_HOST, MCP_PORT, OUTPUT_DIR, VALID_ASPECT_RATIOS
+from config   import GOOGLE_MODEL, MCP_AUTH_TOKEN, MCP_HOST, MCP_PORT, MCP_TRANSPORT, OUTPUT_DIR, VALID_ASPECT_RATIOS
 from auth     import BearerAuthMiddleware
 from utils    import isImagen, safeError, saveImage, toBase64
 from backends import generateWithImagen, generateWithGemini
@@ -159,18 +159,25 @@ def listGeneratedImages(limit: int = 20) -> dict:
 # Execution
 if __name__ == "__main__":
     modelFamily = "imagen" if isImagen(GOOGLE_MODEL) else "gemini"
-    authStatus  = "enabled" if MCP_AUTH_TOKEN else "disabled"
-    logger.info(
-        "Starting Picasso MCP | model=%s | family=%s | auth=%s | port=%d",
-        GOOGLE_MODEL, modelFamily, authStatus, MCP_PORT,
-    )
 
-    if MCP_AUTH_TOKEN:
+    if MCP_TRANSPORT == "stdio":
+        logger.info(
+            "Starting Picasso MCP | transport=stdio | model=%s | family=%s",
+            GOOGLE_MODEL, modelFamily,
+        )
+        mcpServer.run(transport="stdio")
+    elif MCP_AUTH_TOKEN:
         # Build a minimal pure-ASGI app wrapping the FastMCP SSE server with auth middleware.
         # Uses the MCP SDK's SseServerTransport directly so we control the ASGI layer and
         # can insert BearerAuthMiddleware without fighting FastMCP internals.
         # mcpServer._mcp_server is FastMCP's internal mcp.Server instance.
         from mcp.server.sse import SseServerTransport
+
+        authStatus = "enabled"
+        logger.info(
+            "Starting Picasso MCP | transport=sse | model=%s | family=%s | auth=%s | port=%d",
+            GOOGLE_MODEL, modelFamily, authStatus, MCP_PORT,
+        )
 
         sse       = SseServerTransport("/messages/")
         rawServer = mcpServer._mcp_server
@@ -207,4 +214,8 @@ if __name__ == "__main__":
 
         uvicorn.run(BearerAuthMiddleware(_baseApp), host=MCP_HOST, port=MCP_PORT)
     else:
+        logger.info(
+            "Starting Picasso MCP | transport=sse | model=%s | family=%s | auth=disabled | port=%d",
+            GOOGLE_MODEL, modelFamily, MCP_PORT,
+        )
         mcpServer.run(transport="sse", host=MCP_HOST, port=MCP_PORT)

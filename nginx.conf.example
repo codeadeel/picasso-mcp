@@ -1,15 +1,21 @@
 # Example Nginx reverse-proxy config for picasso-mcp
 #
-# Place this in /etc/nginx/sites-available/picasso-mcp
-# then: sudo ln -s /etc/nginx/sites-available/picasso-mcp /etc/nginx/sites-enabled/
-#       sudo certbot --nginx -d mcp.yourdomain.com
-#       sudo nginx -s reload
-#
-# Only two things to change:
-#   1. Replace mcp.yourdomain.com with your actual (sub)domain
-#   2. Replace 127.0.0.1:8000 in the upstream block with your server IP and port
+# SETUP STEPS:
+#   1. Replace mcp.yourdomain.com with your actual domain
+#   2. Match the port below to the HOST port in docker-compose.yml
+#      e.g. if docker-compose has "8000:8000" use 127.0.0.1:8000
+#           if docker-compose has "5143:8000" use 127.0.0.1:5143
+#   3. Place this file:
+#        sudo cp nginx.conf.example /etc/nginx/sites-available/picasso-mcp
+#        sudo ln -s /etc/nginx/sites-available/picasso-mcp /etc/nginx/sites-enabled/
+#   4. Test and reload:
+#        sudo nginx -t && sudo systemctl reload nginx
+#   5. Get SSL certificate (certbot fills in the cert paths automatically):
+#        sudo certbot --nginx -d mcp.yourdomain.com
 
-upstream gai_mcp {
+# !! Always use 127.0.0.1 — never use an internal/private IP here.
+# !! The port must match the left side of the ports mapping in docker-compose.yml.
+upstream picasso_mcp {
     server 127.0.0.1:8000;
 }
 
@@ -17,50 +23,47 @@ server {
     listen 80;
     server_name mcp.yourdomain.com;
 
-    # Redirect all HTTP → HTTPS (certbot will fill this in automatically)
-    return 301 https://$host$request_uri;
+    if ($host = mcp.yourdomain.com) {
+        return 301 https://$host$request_uri;
+    }
+
+    return 404;
 }
 
 server {
     listen 443 ssl;
     server_name mcp.yourdomain.com;
 
-    # TLS certs — managed by certbot (auto-filled after certbot run)
+    # Filled in automatically by certbot — do not add these manually
     # ssl_certificate     /etc/letsencrypt/live/mcp.yourdomain.com/fullchain.pem;
     # ssl_certificate_key /etc/letsencrypt/live/mcp.yourdomain.com/privkey.pem;
 
-    # SSE requires long-lived connections
     proxy_read_timeout    3600s;
     proxy_send_timeout    3600s;
     proxy_connect_timeout 10s;
 
-    # Disable response buffering — critical for SSE streaming
     proxy_buffering off;
     proxy_cache     off;
 
-    # Standard proxy headers
     proxy_set_header Host              $host;
     proxy_set_header X-Real-IP         $remote_addr;
     proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto $scheme;
 
-    # MCP SSE endpoint
     location /sse {
-        proxy_pass         http://gai_mcp/sse;
+        proxy_pass         http://picasso_mcp/sse;
         proxy_http_version 1.1;
         proxy_set_header   Connection "";
         chunked_transfer_encoding off;
     }
 
-    # MCP message POST endpoint
     location /messages {
-        proxy_pass         http://gai_mcp/messages;
+        proxy_pass         http://picasso_mcp/messages;
         proxy_http_version 1.1;
     }
 
-    # Health / info
     location / {
-        proxy_pass         http://gai_mcp/;
+        proxy_pass         http://picasso_mcp/;
         proxy_http_version 1.1;
     }
 }
