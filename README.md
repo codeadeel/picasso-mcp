@@ -7,7 +7,7 @@ flowchart LR
     A([AI Client]) --> B[MCP Server<br>your VM]
     B --> C[Google AI Studio<br>Imagen · Gemini]
     C --> D[(Image<br>saved to disk)]
-    C --> E([base64<br>returned to client])
+    D --> E([URL<br>returned to client])
 ```
 
 ## Features
@@ -32,7 +32,7 @@ Edit `docker-compose.yml`:
 GOOGLE_API_KEY: "AIza..."
 GOOGLE_MODEL:   "gemini-2.0-flash-exp"
 MCP_AUTH_TOKEN: "your-secret-token"
-MCP_TRANSPORT:  "sse"
+BASE_URL:       "https://mcp.yourdomain.com"
 ```
 
 ```bash
@@ -55,20 +55,24 @@ docker compose up -d
 
 Switch to **Agent mode** in Copilot Chat and ask it to generate an image.
 
-**Claude Desktop (remote server)** — go to **Settings → Developer → Edit Config** and add:
+**Claude Desktop (remote server)** — requires [`mcp-remote`](https://www.npmjs.com/package/mcp-remote) as a bridge. Go to **Settings → Developer → Edit Config** and add:
 
 ```json
 {
   "mcpServers": {
     "picasso-mcp": {
-      "url": "https://mcp.yourdomain.com/sse",
-      "headers": { "Authorization": "Bearer your-secret-token" }
+      "command": "mcp-remote",
+      "args": [
+        "https://mcp.yourdomain.com/sse",
+        "--header",
+        "Authorization: Bearer your-secret-token"
+      ]
     }
   }
 }
 ```
 
-Restart Claude Desktop — the server appears under the tools icon in chat. Requires a domain with HTTPS — see [Nginx + HTTPS](https://github.com/codeadeel/picasso-mcp/wiki/Nginx-and-HTTPS).
+Install `mcp-remote` first: `npm install -g mcp-remote`. Requires a domain with HTTPS — see [Nginx + HTTPS](https://github.com/codeadeel/picasso-mcp/wiki/Nginx-and-HTTPS).
 
 **Claude Desktop (local stdio)** — runs the container as a subprocess on your machine. No server needed:
 
@@ -98,6 +102,3 @@ Restart Claude Desktop — the server appears under the tools icon in chat. Requ
 - [Nginx + HTTPS](https://github.com/codeadeel/picasso-mcp/wiki/Nginx-and-HTTPS) — production domain setup
 - [MCP Tools](https://github.com/codeadeel/picasso-mcp/wiki/MCP-Tools) — tool reference and parameters
 
-## License
-
-MIT

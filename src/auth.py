@@ -36,7 +36,7 @@ class BearerAuthMiddleware:
         """
         if scope["type"] == "http":
             path = scope.get("path", "")
-            if not path.startswith("/messages"):
+            if path == "/sse":
                 headers       = {k: v for k, v in scope.get("headers", [])}
                 authHeader    = headers.get(b"authorization", b"").decode()
                 incomingToken = authHeader.removeprefix("Bearer ").strip()

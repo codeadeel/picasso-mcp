@@ -5,9 +5,9 @@ import logging
 import uvicorn
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
-from config   import GOOGLE_MODEL, MCP_AUTH_TOKEN, MCP_HOST, MCP_PORT, MCP_TRANSPORT, OUTPUT_DIR, VALID_ASPECT_RATIOS
+from config   import BASE_URL, GOOGLE_MODEL, MCP_AUTH_TOKEN, MCP_HOST, MCP_PORT, MCP_TRANSPORT, OUTPUT_DIR, VALID_ASPECT_RATIOS
 from auth     import BearerAuthMiddleware
-from utils    import isImagen, safeError, saveImage, toBase64
+from utils    import isImagen, safeError, saveImage
 from backends import generateWithImagen, generateWithGemini
 
 # %%
@@ -16,12 +16,20 @@ logger = logging.getLogger(__name__)
 
 # %%
 # MCP Server Definition
+_urlNote = (
+    f"Generated images are accessible at {BASE_URL}/images/<filename>. "
+    "Always share this URL with the user so they can view the full-quality image. "
+    if BASE_URL else
+    "Images are saved on the server filesystem. "
+)
 mcpServer = FastMCP(
     name         = "Picasso MCP",
     instructions = (
         "Generate images using Google AI Studio models (Imagen or Gemini). "
         f"Configured model: {GOOGLE_MODEL}. "
-        "Call generateImage with a text prompt. Images are returned as base64 PNG data."
+        "Call generateImage with a text prompt. "
+        + _urlNote +
+        "Do not attempt to read or copy image files — just share the URL from the tool result."
     ),
 )
 
@@ -90,11 +98,10 @@ def generateImage(
     for idx, imageBytes in enumerate(allBytes):
         stem      = f"{filename}_{idx + 1}" if filename and numberOfImages > 1 else filename
         savedPath = saveImage(imageBytes, stem)
-        imageResults.append({
-            "path"     : str(savedPath),
-            "base64"   : toBase64(imageBytes),
-            "mime_type": "image/png",
-        })
+        info = {"path": str(savedPath)}
+        if BASE_URL:
+            info["url"] = f"{BASE_URL}/images/{savedPath.name}"
+        imageResults.append(info)
 
     return {
         "model"      : GOOGLE_MODEL,
@@ -198,11 +205,30 @@ if __name__ == "__main__":
                 if msg["type"] == "lifespan.shutdown":
                     await send({"type": "lifespan.shutdown.complete"})
             elif scope["type"] == "http":
-                path = scope.get("path", "")
-                if path == "/sse":
+                path   = scope.get("path", "")
+                method = scope.get("method", "GET")
+                if path == "/sse" and method == "GET":
                     await _handleSse(scope, receive, send)
                 elif path.startswith("/messages/"):
                     await sse.handle_post_message(scope, receive, send)
+                elif path.startswith("/images/"):
+                    filename = path[len("/images/"):]
+                    filepath = OUTPUT_DIR / filename
+                    if filepath.exists() and filepath.suffix == ".png" and filepath.parent.resolve() == OUTPUT_DIR.resolve():
+                        imageBytes = filepath.read_bytes()
+                        await send({
+                            "type"   : "http.response.start",
+                            "status" : 200,
+                            "headers": [
+                                (b"content-type",   b"image/png"),
+                                (b"content-length", str(len(imageBytes)).encode()),
+                                (b"cache-control",  b"public, max-age=3600"),
+                            ],
+                        })
+                        await send({"type": "http.response.body", "body": imageBytes})
+                    else:
+                        await send({"type": "http.response.start", "status": 404, "headers": [(b"content-type", b"application/json")]})
+                        await send({"type": "http.response.body", "body": b'{"error": "Not Found"}'})
                 else:
                     body = b'{"error": "Not Found"}'
                     await send({

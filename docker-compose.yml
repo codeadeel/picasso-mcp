@@ -31,6 +31,11 @@ services:
       # Output directory inside the container (mapped to ./images on host)
       OUTPUT_DIR: "/images"
 
+      # Public base URL for serving generated images (e.g. https://mcp.yourdomain.com)
+      # When set, tool responses return image URLs instead of base64 — required for Claude Desktop
+      # Leave empty to return base64 instead (may be too large for some clients)
+      BASE_URL: ""
+
       # Transport mode — "sse" for remote clients (VS Code, Nginx), "stdio" for Claude Desktop
       MCP_TRANSPORT: "sse"
 

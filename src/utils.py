@@ -1,9 +1,11 @@
 # %%
 # Importing Necessary Libraries
 import base64
+import io
 import logging
 from pathlib import Path
 from datetime import datetime
+from PIL import Image as PilImage
 from config import GOOGLE_API_KEY, OUTPUT_DIR
 
 # %%
@@ -68,6 +70,32 @@ def saveImage(imageBytes: bytes, stem: str | None) -> Path:
     outPath.write_bytes(imageBytes)
     logger.info("Saved → %s", outPath)
     return outPath
+
+
+def toThumbnail(imageBytes: bytes, maxSize: int = 800, quality: int = 75) -> bytes:
+    """
+    Creates a compressed JPEG thumbnail from raw image bytes.
+    Used for inline display in clients that have message size limits.
+    Arguments:
+    ----------
+    imageBytes : bytes
+        Raw PNG image data.
+    maxSize : int
+        Maximum width or height in pixels. Aspect ratio is preserved.
+        Default : 800
+    quality : int
+        JPEG compression quality (1-95).
+        Default : 75
+    Returns:
+    --------
+    bytes
+        Compressed JPEG image bytes.
+    """
+    img = PilImage.open(io.BytesIO(imageBytes)).convert("RGB")
+    img.thumbnail((maxSize, maxSize), PilImage.LANCZOS)
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG", quality=quality, optimize=True)
+    return buf.getvalue()
 
 
 def toBase64(data: bytes) -> str:

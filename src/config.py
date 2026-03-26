@@ -18,6 +18,7 @@ OUTPUT_DIR     = Path(os.environ.get("OUTPUT_DIR", "/images"))
 MCP_HOST       = os.environ.get("MCP_HOST", "0.0.0.0")
 MCP_PORT       = int(os.environ.get("MCP_PORT", "8000"))
 MCP_TRANSPORT  = os.environ.get("MCP_TRANSPORT", "sse")
+BASE_URL       = os.environ.get("BASE_URL", "").rstrip("/")
 
 if not GOOGLE_API_KEY:
     raise RuntimeError("GOOGLE_API_KEY environment variable is required")
