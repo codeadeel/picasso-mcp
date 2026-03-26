@@ -35,19 +35,21 @@ class BearerAuthMiddleware:
             ASGI send channel.
         """
         if scope["type"] == "http":
-            headers       = {k: v for k, v in scope.get("headers", [])}
-            authHeader    = headers.get(b"authorization", b"").decode()
-            incomingToken = authHeader.removeprefix("Bearer ").strip()
-            if incomingToken != MCP_AUTH_TOKEN:
-                errorBody = b'{"error": "Unauthorized - invalid or missing Bearer token"}'
-                await send({
-                    "type"    : "http.response.start",
-                    "status"  : 401,
-                    "headers" : [
-                        (b"content-type",   b"application/json"),
-                        (b"content-length", str(len(errorBody)).encode()),
-                    ],
-                })
-                await send({"type": "http.response.body", "body": errorBody})
-                return
+            path = scope.get("path", "")
+            if not path.startswith("/messages"):
+                headers       = {k: v for k, v in scope.get("headers", [])}
+                authHeader    = headers.get(b"authorization", b"").decode()
+                incomingToken = authHeader.removeprefix("Bearer ").strip()
+                if incomingToken != MCP_AUTH_TOKEN:
+                    errorBody = b'{"error": "Unauthorized - invalid or missing Bearer token"}'
+                    await send({
+                        "type"    : "http.response.start",
+                        "status"  : 401,
+                        "headers" : [
+                            (b"content-type",   b"application/json"),
+                            (b"content-length", str(len(errorBody)).encode()),
+                        ],
+                    })
+                    await send({"type": "http.response.body", "body": errorBody})
+                    return
         await self.app(scope, receive, send)
