@@ -1,0 +1,39 @@
+services:
+
+  # ><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><
+  # Picasso MCP Server
+  picasso-mcp:
+    build: .
+    image: picasso-mcp:latest
+    container_name: picasso
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+
+      # Google AI Studio API key — get one at aistudio.google.com
+      GOOGLE_API_KEY: ""
+
+      # Model to use — server auto-detects the correct API based on model name:
+      #   Imagen family  → uses generate_images() API
+      #   Gemini family  → uses generate_content() API
+      #
+      #   imagen-3.0-generate-002                    (best quality, may need billing)
+      #   imagen-3.0-fast-generate-001               (faster Imagen)
+      #   gemini-2.0-flash-exp                       (free tier)
+      #   gemini-2.0-flash-preview-image-generation  (free tier)
+      GOOGLE_MODEL: "imagen-3.0-generate-002"
+
+      # Bearer token to protect the MCP server — leave empty to disable auth
+      # Clients must send: Authorization: Bearer <token>
+      MCP_AUTH_TOKEN: ""
+
+      # Output directory inside the container (mapped to ./images on host)
+      OUTPUT_DIR: "/images"
+
+      # Internal bind address — no need to change when using Docker
+      MCP_HOST: "0.0.0.0"
+      MCP_PORT: "8000"
+
+    volumes:
+      - ./picasso-images:/images

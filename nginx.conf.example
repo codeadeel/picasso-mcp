@@ -1,0 +1,66 @@
+# Example Nginx reverse-proxy config for picasso-mcp
+#
+# Place this in /etc/nginx/sites-available/picasso-mcp
+# then: sudo ln -s /etc/nginx/sites-available/picasso-mcp /etc/nginx/sites-enabled/
+#       sudo certbot --nginx -d mcp.yourdomain.com
+#       sudo nginx -s reload
+#
+# Only two things to change:
+#   1. Replace mcp.yourdomain.com with your actual (sub)domain
+#   2. Replace 127.0.0.1:8000 in the upstream block with your server IP and port
+
+upstream gai_mcp {
+    server 127.0.0.1:8000;
+}
+
+server {
+    listen 80;
+    server_name mcp.yourdomain.com;
+
+    # Redirect all HTTP → HTTPS (certbot will fill this in automatically)
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    server_name mcp.yourdomain.com;
+
+    # TLS certs — managed by certbot (auto-filled after certbot run)
+    # ssl_certificate     /etc/letsencrypt/live/mcp.yourdomain.com/fullchain.pem;
+    # ssl_certificate_key /etc/letsencrypt/live/mcp.yourdomain.com/privkey.pem;
+
+    # SSE requires long-lived connections
+    proxy_read_timeout    3600s;
+    proxy_send_timeout    3600s;
+    proxy_connect_timeout 10s;
+
+    # Disable response buffering — critical for SSE streaming
+    proxy_buffering off;
+    proxy_cache     off;
+
+    # Standard proxy headers
+    proxy_set_header Host              $host;
+    proxy_set_header X-Real-IP         $remote_addr;
+    proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+
+    # MCP SSE endpoint
+    location /sse {
+        proxy_pass         http://gai_mcp/sse;
+        proxy_http_version 1.1;
+        proxy_set_header   Connection "";
+        chunked_transfer_encoding off;
+    }
+
+    # MCP message POST endpoint
+    location /messages {
+        proxy_pass         http://gai_mcp/messages;
+        proxy_http_version 1.1;
+    }
+
+    # Health / info
+    location / {
+        proxy_pass         http://gai_mcp/;
+        proxy_http_version 1.1;
+    }
+}
