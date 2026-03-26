@@ -55,10 +55,10 @@ Switch to **Agent mode** in Copilot Chat and ask it to generate an image.
 ## Wiki
 
 - [Configuration](https://github.com/codeadeel/picasso-mcp/wiki/Configuration) — models, environment variables
-- [Clients](https://github.com/codeadeel/picasso-mcp/wiki/Clients) — VS Code, Claude Desktop setup
-- [Auth](https://github.com/codeadeel/picasso-mcp/wiki/Auth) — Bearer token setup and testing
-- [Nginx + HTTPS](https://github.com/codeadeel/picasso-mcp/wiki/Nginx) — production domain setup
-- [MCP Tools](https://github.com/codeadeel/picasso-mcp/wiki/Tools) — tool reference and parameters
+- [AI Clients](https://github.com/codeadeel/picasso-mcp/wiki/AI-Clients) — VS Code, Claude Desktop setup
+- [Authentication](https://github.com/codeadeel/picasso-mcp/wiki/Authentication) — Bearer token setup and testing
+- [Nginx + HTTPS](https://github.com/codeadeel/picasso-mcp/wiki/Nginx-and-HTTPS) — production domain setup
+- [MCP Tools](https://github.com/codeadeel/picasso-mcp/wiki/MCP-Tools) — tool reference and parameters
 
 ## License
 
