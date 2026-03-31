@@ -5,10 +5,10 @@ import logging
 import uvicorn
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
-from config   import BASE_URL, GOOGLE_MODEL, MCP_AUTH_TOKEN, MCP_HOST, MCP_PORT, MCP_TRANSPORT, OUTPUT_DIR, VALID_ASPECT_RATIOS
+from config   import BASE_URL, GOOGLE_MODEL, GEMINI_MODEL, MCP_AUTH_TOKEN, MCP_HOST, MCP_PORT, MCP_TRANSPORT, OUTPUT_DIR, VALID_ASPECT_RATIOS
 from auth     import BearerAuthMiddleware
 from utils    import isImagen, safeError, saveImage
-from backends import generateWithImagen, generateWithGemini
+from backends import generateWithImagen, generateWithGemini, analyzeWithGemini
 
 # %%
 # Logger
@@ -29,7 +29,10 @@ mcpServer = FastMCP(
         f"Configured model: {GOOGLE_MODEL}. "
         "Call generateImage with a text prompt. "
         + _urlNote +
-        "Do not attempt to read or copy image files — just share the URL from the tool result."
+        "Do not attempt to read or copy image files — just share the URL from the tool result. "
+        "Use analyzeImage to analyze, describe, edit, or answer questions about an existing image. "
+        "It accepts the image as a base64 string (with or without data URI prefix), an HTTPS URL, or a server-side file path. "
+        "Gemini decides whether to return text, an edited image, or both based on the prompt."
     ),
 )
 
@@ -112,6 +115,65 @@ def generateImage(
 
 
 @mcpServer.tool()
+def analyzeImage(
+    image   : str,
+    prompt  : str        = "Describe this image in detail.",
+    filename: str | None = None,
+) -> dict:
+    """
+    Analyze, describe, or edit an image using Gemini.
+    Provide an input image together with a text prompt. Gemini will return a text
+    response, an edited/generated image, or both — depending on the prompt.
+    The image parameter accepts any of these formats:
+      - Base64 string with data URI prefix: "data:image/png;base64,<data>"
+      - Raw base64 string (PNG, JPEG, WebP, GIF, BMP, TIFF)
+      - HTTPS URL: "https://example.com/photo.jpg"
+      - Local server file path: "/images/my_image.png"
+    Arguments:
+    ----------
+    image : str
+        The input image (base64, HTTPS URL, or file path).
+    prompt : str
+        Instruction for the model — e.g. "Describe this image", "Remove the background",
+        "Convert to watercolor style". Default: "Describe this image in detail."
+    filename : str | None
+        Base name for the output image file (if the model produces one). Auto-generated if omitted.
+    Returns:
+    --------
+    dict
+        Contains model, prompt, and one or both of:
+        - analysis (str): text response from the model
+        - image (dict): path (and url if BASE_URL is set) of the saved output image
+    """
+    logger.info("Analyzing image | prompt=%r", prompt[:80])
+    try:
+        result = analyzeWithGemini(image, prompt)
+    except ToolError:
+        raise
+    except Exception as exc:
+        safeMsg = safeError(exc)
+        logger.error("Vision analysis error: %s", safeMsg)
+        raise ToolError(f"Image analysis failed: {safeMsg}") from exc
+
+    response = {
+        "model" : result["model"],
+        "prompt": prompt,
+    }
+
+    if result["text"]:
+        response["analysis"] = result["text"]
+
+    if result["imageBytes"]:
+        savedPath = saveImage(result["imageBytes"], filename)
+        imageInfo = {"path": str(savedPath)}
+        if BASE_URL:
+            imageInfo["url"] = f"{BASE_URL}/images/{savedPath.name}"
+        response["image"] = imageInfo
+
+    return response
+
+
+@mcpServer.tool()
 def getServerInfo() -> dict:
     """
     Returns the current server configuration including model, output directory,
@@ -125,6 +187,7 @@ def getServerInfo() -> dict:
     return {
         "model"              : GOOGLE_MODEL,
         "modelFamily"        : modelFamily,
+        "geminiModel"        : GEMINI_MODEL,
         "outputDirectory"    : str(OUTPUT_DIR),
         "validAspectRatios"  : sorted(VALID_ASPECT_RATIOS),
         "maxImagesPerRequest": 4,

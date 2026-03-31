@@ -5,7 +5,9 @@ import io
 import logging
 from pathlib import Path
 from datetime import datetime
+import httpx
 from PIL import Image as PilImage
+from fastmcp.exceptions import ToolError
 from config import GOOGLE_API_KEY, OUTPUT_DIR
 
 # %%
@@ -129,3 +131,71 @@ def fromBase64(data: str | bytes) -> bytes:
     if isinstance(data, (bytes, bytearray)):
         return bytes(data)
     return base64.b64decode(data)
+
+
+def _detectMime(data: bytes) -> str:
+    if data[:8].startswith(b"\x89PNG"):              return "image/png"
+    if data[:3] == b"\xff\xd8\xff":                  return "image/jpeg"
+    if data[:6] in (b"GIF87a", b"GIF89a"):           return "image/gif"
+    if len(data) >= 12 and data[8:12] == b"WEBP":   return "image/webp"
+    if data[:2] == b"BM":                            return "image/bmp"
+    if data[:4] in (b"II*\x00", b"MM\x00*"):        return "image/tiff"
+    return "image/jpeg"
+
+
+def loadImageBytes(source: str) -> tuple[bytes, str]:
+    """
+    Resolves an image source to (raw bytes, mime_type).
+    Accepts:
+      - Data URI:    "data:image/png;base64,<data>"
+      - Raw base64:  plain base64 string
+      - HTTPS URL:   fetched with httpx
+      - Local file path
+    Arguments:
+    ----------
+    source : str
+        Image source string in any of the accepted formats.
+    Returns:
+    --------
+    tuple[bytes, str]
+        Raw image bytes and the detected/declared MIME type.
+    Raises:
+    -------
+    ToolError
+        On fetch failure, unreadable file, or unrecognized format.
+    """
+    src = source.strip()
+
+    # Data URI: "data:image/png;base64,<payload>"
+    if src.startswith("data:"):
+        header, _, payload = src.partition(",")
+        mimeType = header.split(";")[0][5:]  # strip "data:"
+        return fromBase64(payload), mimeType
+
+    # HTTPS URL
+    if src.startswith("https://"):
+        try:
+            resp = httpx.get(src, follow_redirects=True, timeout=30, headers={"User-Agent": "PicassoMCP/1.0"})
+            resp.raise_for_status()
+        except Exception as exc:
+            raise ToolError(f"Failed to fetch image URL: {exc}") from exc
+        ct = resp.headers.get("content-type", "")
+        mimeType = ct.split(";")[0].strip() if ct.startswith("image/") else _detectMime(resp.content)
+        return resp.content, mimeType
+
+    # HTTP rejected for security
+    if src.startswith("http://"):
+        raise ToolError("Only HTTPS URLs are supported for security reasons.")
+
+    # Local file path
+    path = Path(src)
+    if path.exists() and path.is_file():
+        data = path.read_bytes()
+        return data, _detectMime(data)
+
+    # Raw base64 fallback
+    try:
+        data = fromBase64(src)
+        return data, _detectMime(data)
+    except Exception as exc:
+        raise ToolError(f"Unrecognized image source format: {exc}") from exc

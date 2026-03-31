@@ -13,6 +13,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 # Environment Configuration
 GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY", "")
 GOOGLE_MODEL   = os.environ.get("GOOGLE_MODEL", "imagen-3.0-generate-002")
+GEMINI_MODEL   = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
 MCP_AUTH_TOKEN = os.environ.get("MCP_AUTH_TOKEN", "")
 OUTPUT_DIR     = Path(os.environ.get("OUTPUT_DIR", "/images"))
 MCP_HOST       = os.environ.get("MCP_HOST", "0.0.0.0")
